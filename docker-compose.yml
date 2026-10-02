@@ -1,0 +1,23 @@
+services:
+  sofia:
+    build: .
+    image: sofia-telegram:latest
+    container_name: sofia
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_PATH: /app/data/sofia.db
+      PERSONA_DIR: /app/persona
+    volumes:
+      # Named volume: survives rebuilds, no host permission issues.
+      - sofia-data:/app/data
+      # Persona files incl. your git-ignored *.private.yaml overlays. Edit, then `docker compose restart`.
+      - ./persona:/app/persona:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  sofia-data:

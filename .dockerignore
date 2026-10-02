@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+data/
+*.db
+*.db-*
+.venv/
+venv/
+.git/
+.pytest_cache/
+**/__pycache__/
+tests/
+# private overlays are bind-mounted at runtime, never baked into the image
+persona/*.private.yaml

@@ -1,0 +1,29 @@
+[project]
+name = "sofia-telegram"
+version = "1.0.0"
+description = "A private Telegram AI companion with persistent memory and an evolving relationship."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "python-telegram-bot[job-queue]==22.8",
+    "openai==3.24.0",
+    "aiosqlite==0.22.1",
+    "PyYAML==6.0.3",
+    "python-dotenv==1.2.4",
+    "pydantic==2.13.5",
+    "tzdata>=2025.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==9.1.1", "pytest-asyncio==1.4.0"]
+webhooks = ["python-telegram-bot[job-queue,webhooks]==22.8"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning:telegram.*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"

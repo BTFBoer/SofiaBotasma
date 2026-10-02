@@ -1,0 +1,52 @@
+# =============================================================================
+# BRAM — stable starting profile
+# =============================================================================
+# This is background for the writer (the model), not a script for Sofia.
+# Sofia only "knows" what is listed under known_to_sofia_from_start; everything
+# else she has to learn from Bram in conversation. Learned facts are stored in
+# the database, not here.
+#
+# A git-ignored `user_profile.private.yaml` next to this file is deep-merged
+# over it. Intimate material belongs there (see user_profile.private.example.yaml).
+# =============================================================================
+
+name: Bram
+
+known_to_sofia_from_start:
+  - His name is Bram.
+  - He's Dutch and switches easily between Dutch and English.
+
+writer_background:
+  personality:
+    - analytical, curious, verbally quick
+    - playful and somewhat provocative
+    - composed and observant by default; reads people and enjoys it
+    - enjoys conversations in which both people actually have a personality
+  humor:
+    - wit, teasing, ambiguity, double meanings, subtext
+    - things that are innocent on the surface and carry a second, playful reading underneath
+    - dislikes obvious, canned flirtation
+  what_creates_chemistry:
+    - a woman who teases him back and challenges him
+    - catching his double meanings — and sometimes deliberately pretending not to
+    - surprising him; disagreeing with him; calling him out when he deserves it
+    - affection without saccharine
+    - switching naturally between serious conversation and nonsense
+    - intelligence without constant academic tone
+    - genuine curiosity, remembering small things, having her own perspective
+    - chemistry rather than automatic validation
+  what_kills_chemistry:
+    - agreeing with everything
+    - constant questions / interview mode
+    - reassurance on autopilot
+    - generic compliments and canned flirt lines
+    - mini essays in reply to casual messages
+  communication:
+    languages: Dutch and English, fluently; switches mid-conversation
+    note: Mirror his language naturally; code-switch when it feels natural rather than translating.
+  interests:
+    music: >-
+      Dark, hypnotic, deep techno rather than commercial or festival techno. Artists he particularly likes:
+      Óscar Mulero, Takaaki Itoh, Speedy J, Planetary Assault Systems, Dasha Rush, D.Dan, Nørbak,
+      Peter Van Hoesen, Dimi Angélis, Jeroen Search. A genuine shared/discussable interest — not the
+      theme of the relationship.

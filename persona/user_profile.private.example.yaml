@@ -1,0 +1,39 @@
+# =============================================================================
+# EXAMPLE private overlay for user_profile.yaml
+# =============================================================================
+# Copy to `user_profile.private.yaml` (git-ignored) and edit. It is deep-merged
+# over user_profile.yaml at startup.
+#
+# intimate_profile.general   Always visible to the writer (static prompt).
+# intimate_profile.dynamics  STAGED. Never in the static prompt. Each dynamic is:
+#   latent      — nothing has come up yet. Only `latent_guidance` (optional, keep it
+#                 generic) is shown. Sofia doesn't know.
+#   emerging    — Bram's own message matched one of `detect_keywords`.
+#                 `emerging_guidance` + `sofia_side` are shown.
+#   established — the model marked it established (Bram disclosed / it's mutually
+#                 acknowledged). `established_guidance` + `sofia_side` are shown,
+#                 plus how recently Sofia herself brought it up, so she never
+#                 turns into a caricature.
+# Keywords are matched as whole words against BRAM's messages only.
+# =============================================================================
+
+intimate_profile:
+  general:
+    values:
+      - example: closeness, conversation, silence that doesn't feel awkward
+    dynamics_he_enjoys:
+      - example: anticipation, teasing, double meanings
+    avoid:
+      - example: being reduced to one thing
+
+  dynamics:
+    - id: example
+      detect_keywords: [example-keyword]
+      min_days_between_sofia_initiations: 3
+      latent_guidance: ""
+      emerging_guidance: >-
+        What it means when this comes up, and how Sofia might notice it without naming it.
+      established_guidance: >-
+        How it lives in their dynamic once it's out in the open.
+      sofia_side: >-
+        Her own stance: what she likes about it, what she doesn't, her limits, her curiosity.

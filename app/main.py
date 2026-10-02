@@ -38,9 +38,15 @@ def _init_db(settings: Settings) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="sofia", description="Private Telegram AI companion")
+    parser.add_argument("--setup", action="store_true", help="interactive first-time setup (writes .env)")
     parser.add_argument("--check", action="store_true", help="validate config and persona files, then exit")
     parser.add_argument("--init-db", action="store_true", help="initialize the database, then exit")
     args = parser.parse_args(argv)
+
+    if args.setup:
+        from app.setup_wizard import run as run_setup
+
+        return run_setup()
 
     try:
         settings = Settings.from_env()
@@ -86,6 +92,10 @@ def main(argv: list[str] | None = None) -> int:
     engine = CompanionEngine(settings, store, provider, persona, profile)
     controls = ControlService(settings, store, provider)
     bot = SofiaBot(settings, db=db, store=store, provider=provider, engine=engine, controls=controls)
+    if settings.keep_awake:
+        from app.utils.keepawake import keep_awake
+
+        keep_awake()
     bot.run()
     return 0
 

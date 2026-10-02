@@ -118,6 +118,7 @@ class Settings:
     keep_images: bool = False
     image_dir: Path = field(default_factory=lambda: Path("./data/images"))
     heartbeat_path: Path = field(default_factory=lambda: Path("./data/heartbeat"))
+    keep_awake: bool = True
 
     # --- Logging ------------------------------------------------------------
     log_level: str = "INFO"
@@ -239,6 +240,7 @@ class Settings:
             heartbeat_path=Path(
                 _get(env, "HEARTBEAT_PATH", str(data_dir / "heartbeat")) or str(data_dir / "heartbeat")
             ),
+            keep_awake=_get_bool(env, "KEEP_AWAKE", True),
             log_level=(_get(env, "LOG_LEVEL", "INFO") or "INFO").upper(),
             log_format=log_format,
         )

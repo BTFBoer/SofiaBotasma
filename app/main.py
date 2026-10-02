@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import sys
+from pathlib import Path
 
 from app.companion.engine import CompanionEngine
 from app.companion.persona import PersonaError, load_persona_bundle
@@ -24,6 +25,17 @@ from app.telegram_bot import SofiaBot, build_setup_app
 from app.utils.logging import get_logger, setup_logging
 
 log = get_logger("app")
+
+# Shown in the start window (Dutch, like the start scripts) instead of a traceback.
+STOP_INVALID_TOKEN = (
+    "\nSTOP: Telegram accepteert het token van je bot niet (meer).\n"
+    "Doe 'Instellingen opnieuw doen' uit de handleiding en plak een nieuw token "
+    "(in BotFather: /token).\n"
+)
+STOP_NO_TELEGRAM = (
+    "\nSTOP: Ik kan Telegram niet bereiken. Controleer je internetverbinding "
+    "en start Sofia daarna opnieuw.\n"
+)
 
 
 def _init_db(settings: Settings) -> None:
@@ -63,6 +75,15 @@ def main(argv: list[str] | None = None) -> int:
         build_setup_app(settings).run_polling(drop_pending_updates=True)
         return 0
 
+    if not args.check and settings.persona_dir.resolve() == (Path(__file__).resolve().parents[1] / "persona"):
+        # Private files left in Downloads (or saved as "name (1).yaml") are put in place automatically.
+        from app.setup_wizard import fix_private_files
+
+        try:
+            fix_private_files()
+        except OSError:
+            log.warning("could not check for private persona files", exc_info=True)
+
     try:
         persona, profile, files = load_persona_bundle(settings.persona_dir)
     except PersonaError as exc:
@@ -92,11 +113,23 @@ def main(argv: list[str] | None = None) -> int:
     engine = CompanionEngine(settings, store, provider, persona, profile)
     controls = ControlService(settings, store, provider)
     bot = SofiaBot(settings, db=db, store=store, provider=provider, engine=engine, controls=controls)
-    if settings.keep_awake:
-        from app.utils.keepawake import keep_awake
+    from app.utils.keepawake import disable_quick_edit, keep_awake
 
+    if settings.keep_awake:
         keep_awake()
-    bot.run()
+    disable_quick_edit()
+    from telegram.error import InvalidToken, NetworkError
+
+    try:
+        bot.run()
+    except InvalidToken:
+        log.error("Telegram rejected the bot token")
+        print(STOP_INVALID_TOKEN, file=sys.stderr)
+        return 1
+    except NetworkError as exc:
+        log.error("cannot reach Telegram at startup: %s", exc)
+        print(STOP_NO_TELEGRAM, file=sys.stderr)
+        return 1
     return 0
 
 

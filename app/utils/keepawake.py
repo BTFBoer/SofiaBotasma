@@ -1,7 +1,12 @@
-"""Stop the computer from going to sleep on its own while Sofia runs.
+"""Small desktop conveniences for people running Sofia on their own computer.
 
-Only prevents *idle* sleep; closing a laptop lid can still put it to sleep.
-Windows: SetThreadExecutionState. macOS: `caffeinate` tied to this process.
+keep_awake: stop the computer from idling to sleep while Sofia runs (closing a
+laptop lid can still put it to sleep). Windows: SetThreadExecutionState.
+macOS: `caffeinate` tied to this process.
+
+disable_quick_edit: in the classic Windows console one stray mouse click puts
+the window in "select" mode, which blocks all output — and with it Sofia —
+until Esc is pressed. Turned off while the bot runs.
 """
 
 from __future__ import annotations
@@ -33,3 +38,21 @@ def keep_awake() -> None:
             log.info("keeping the computer awake while Sofia runs")
     except Exception:
         log.warning("could not prevent sleep", exc_info=True)
+
+
+def disable_quick_edit() -> None:
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        kernel32.GetStdHandle.restype = wintypes.HANDLE
+        handle = kernel32.GetStdHandle(-10)  # STD_INPUT_HANDLE
+        mode = wintypes.DWORD()
+        if kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+            enable_quick_edit, enable_extended_flags = 0x0040, 0x0080
+            kernel32.SetConsoleMode(handle, (mode.value & ~enable_quick_edit) | enable_extended_flags)
+    except Exception:
+        log.warning("could not disable QuickEdit", exc_info=True)

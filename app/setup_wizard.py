@@ -4,13 +4,15 @@ Asks for the Telegram bot token and the OpenAI key, checks both live, finds
 the owner's numeric Telegram id by asking them to message the bot, picks a
 model the key actually has access to, and writes .env. Written for people
 who have never used a terminal: one question at a time, every answer checked
-immediately, plain-language errors.
+immediately, plain-language errors, secrets wiped from the screen.
 """
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
+import subprocess
 import sys
 import time
 from collections.abc import Callable
@@ -23,6 +25,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ENV_PATH = ROOT / ".env"
 TEMPLATE_PATH = ROOT / ".env.example"
 PERSONA_DIR = ROOT / "persona"
+PRIVATE_FILES = ("persona.private.yaml", "user_profile.private.yaml")
 
 # Suggestions only: the app itself always reads the model from .env.
 PREFERRED_CHAT_MODELS = [
@@ -40,14 +43,23 @@ PREFERRED_CHAT_MODELS = [
 PREFERRED_UTILITY_MODELS = ["gpt-6-luna", "gpt-5.6-luna", "gpt-5.4-mini", "gpt-5.1-mini", "gpt-5-mini"]
 EMBEDDING_MODEL = "text-embedding-3-small"
 TRANSCRIPTION_MODEL = "gpt-4o-mini-transcribe"
-_NOT_CHAT = ("audio", "realtime", "transcribe", "tts", "image", "search", "embedding", "codex", "moderation", "instruct")
+_NOT_CHAT = (
+    "audio", "realtime", "transcribe", "tts", "image", "search", "embedding", "codex", "moderation", "instruct",
+    "-pro", "deep-research",
+)  # fmt: skip
 
 TOKEN_RE = re.compile(r"^\d{5,}:[A-Za-z0-9_-]{30,}$")
+TOKEN_SEARCH = re.compile(r"\d{5,}:[A-Za-z0-9_-]{30,}")
+KEY_SEARCH = re.compile(r"sk-[A-Za-z0-9_-]{20,}")
 TELEGRAM_API = "https://api.telegram.org"
 
 
 class SetupAbort(Exception):
     """Stops the wizard with a plain-language message."""
+
+
+class TelegramBusy(SetupAbort):
+    """Another running copy of Sofia is polling this bot."""
 
 
 # --------------------------------------------------------------------------- pure helpers (tested)
@@ -57,12 +69,23 @@ def clean_paste(value: str) -> str:
     return re.sub(r"[\s​‌‍﻿]", "", value)
 
 
+def pick(pattern: re.Pattern[str], raw: str) -> str:
+    """Find the code inside whatever was pasted (a label in front, quotes, extra text)."""
+    cleaned = clean_paste(raw)
+    match = pattern.search(cleaned)
+    return match.group(0) if match else cleaned
+
+
 def looks_like_bot_token(value: str) -> bool:
     return bool(TOKEN_RE.match(value))
 
 
 def looks_like_openai_key(value: str) -> bool:
     return value.startswith("sk-") and len(value) >= 20
+
+
+def mask(secret: str) -> str:
+    return f"{secret[:6]}…{secret[-4:]}" if len(secret) > 12 else "…"
 
 
 def parse_env(text: str) -> dict[str, str]:
@@ -102,8 +125,9 @@ def candidate_chat_models(available: set[str] | None) -> list[str]:
     preferred = [m for m in PREFERRED_CHAT_MODELS if m in available]
     if preferred:
         return preferred
-    generic = [m for m in available if m.startswith("gpt-") and not any(x in m for x in _NOT_CHAT)]
-    return sorted(generic, reverse=True)[:6]
+    generic = sorted((m for m in available if m.startswith("gpt-") and not any(x in m for x in _NOT_CHAT)), reverse=True)
+    small = [m for m in generic if "mini" in m or "nano" in m]
+    return ([m for m in generic if m not in small] + small)[:6]
 
 
 def candidate_utility_models(available: set[str] | None, chat_model: str) -> list[str]:
@@ -112,9 +136,47 @@ def candidate_utility_models(available: set[str] | None, chat_model: str) -> lis
     return [m for m in PREFERRED_UTILITY_MODELS if m in available] + [chat_model]
 
 
+def find_misnamed(name: str, folders: list[Path]) -> Path | None:
+    """Find a private file saved under a slightly wrong name or in the wrong folder.
+
+    Browsers rename repeat downloads ("persona.private (1).yaml", "persona.private-1.yaml")
+    and Safari sometimes appends ".txt"; people also leave files in Downloads.
+    """
+    stem = name.removesuffix(".yaml")
+    found: list[Path] = []
+    for folder in folders:
+        if not folder.is_dir():
+            continue
+        try:
+            candidates = list(folder.glob(stem + "*"))
+        except OSError:
+            continue
+        for path in candidates:
+            if (
+                path.is_file()
+                and "example" not in path.name
+                and path.suffix.lower() in {".yaml", ".yml", ".txt"}
+                and path != PERSONA_DIR / name
+            ):
+                found.append(path)
+    if not found:
+        return None
+    return max(found, key=lambda p: p.stat().st_mtime)
+
+
 # --------------------------------------------------------------------------- console helpers
 def say(text: str = "") -> None:
     print(text, flush=True)
+
+
+def clear_screen() -> None:
+    """Wipe the window so a pasted secret never ends up on a help screenshot."""
+    if not sys.stdout.isatty():
+        return
+    if os.name == "nt":
+        os.system("cls")
+    else:
+        print("\033[H\033[2J\033[3J", end="", flush=True)
 
 
 def ask(prompt: str, input_fn: Callable[[str], str] = input) -> str:
@@ -125,66 +187,111 @@ def ask(prompt: str, input_fn: Callable[[str], str] = input) -> str:
 
 
 def ask_yes_no(prompt: str, default: bool, input_fn: Callable[[str], str] = input) -> bool:
-    suffix = " [J/n] " if default else " [j/N] "
     while True:
-        answer = ask(prompt + suffix, input_fn).strip().lower()
+        answer = ask(f"{prompt} (typ j of n, daarna Enter): ", input_fn).strip().lower()
         if not answer:
             return default
         if answer in {"j", "ja", "y", "yes"}:
             return True
         if answer in {"n", "nee", "no"}:
             return False
-        say("   Typ j (ja) of n (nee) en druk op Enter.")
+        say("   Typ alleen de letter j (ja) of n (nee) en druk op Enter.")
+
+
+def banner() -> None:
+    say()
+    say("=" * 60)
+    say("  Sofia — eerste keer instellen")
+    say("=" * 60)
+
+
+def heading(number: int, title: str) -> None:
+    say(f"VRAAG {number} van 3 — {title}")
 
 
 # --------------------------------------------------------------------------- Telegram
 def telegram_get(token: str, method: str, params: dict[str, Any] | None = None, timeout: float = 15.0) -> Any:
     try:
         response = httpx.get(f"{TELEGRAM_API}/bot{token}/{method}", params=params or {}, timeout=timeout)
-    except httpx.HTTPError as exc:
+        data = response.json() if response.content else {}
+    except (httpx.HTTPError, ValueError) as exc:
         raise SetupAbort(
             "Ik kan Telegram niet bereiken. Controleer je internetverbinding en probeer het opnieuw."
         ) from exc
-    data = response.json() if response.content else {}
-    if response.status_code == 401 or (not data.get("ok") and data.get("error_code") == 401):
+    if response.status_code == 401 or data.get("error_code") == 401:
         return None
+    if response.status_code == 409 or data.get("error_code") == 409:
+        raise TelegramBusy(
+            "Sofia draait nog in een ander venster. Sluit dat venster eerst. Start daarna opnieuw."
+        )
     if not data.get("ok"):
         raise SetupAbort(f"Telegram gaf een foutmelding: {data.get('description', response.status_code)}")
     return data["result"]
 
 
+def drop_pending(token: str) -> None:
+    """Throw away START/'hallo'/anything sent during setup, so Sofia never answers setup messages."""
+    try:
+        telegram_get(token, "deleteWebhook", {"drop_pending_updates": "true"})
+    except SetupAbort:
+        pass
+
+
+def check_existing_token(token: str) -> str | None:
+    me = telegram_get(token, "getMe")
+    return me.get("username", "") if me else None
+
+
 def step_telegram_token(input_fn: Callable[[str], str]) -> tuple[str, str]:
-    say("STAP 1 van 4 — Telegram-bot")
-    say("Plak de code (token) die je van BotFather kreeg en druk op Enter.")
-    say("Plakken in dit venster: rechtermuisklik, of Ctrl+V (Mac: Cmd+V).")
+    heading(1, "Je Telegram-token")
+    say("Plak je Telegram-token (de lange code van BotFather). Druk daarna op Enter.")
+    say("Plakken: Windows = rechtermuisklik in dit venster. Mac = Cmd+V.")
     for _ in range(5):
-        token = clean_paste(ask("Token: ", input_fn))
+        token = pick(TOKEN_SEARCH, ask("Token: ", input_fn))
+        clear_screen()
+        banner()
+        heading(1, "Je Telegram-token")
         if not looks_like_bot_token(token):
-            say("   Dat lijkt geen token. Het ziet eruit als 1234567890:AAH... (cijfers, dubbele punt, letters).")
+            say("   Dat lijkt geen Telegram-token. Het ziet eruit als 1234567890:AAH... (cijfers, dubbele punt, letters).")
+            say("   Kopieer het nog een keer uit BotFather en plak het hier.")
             continue
-        me = telegram_get(token, "getMe")
-        if me is None:
-            say("   Telegram kent dit token niet. Kopieer het nog een keer helemaal uit BotFather.")
+        say(f"   Token ontvangen ({mask(token)}). Ik controleer het...")
+        username = check_existing_token(token)
+        if username is None:
+            say("   Telegram kent dit token niet. Kopieer het nog een keer HELEMAAL uit BotFather en plak het hier.")
             continue
-        username = me.get("username", "")
         say(f"   ✓ Gevonden: je bot heet @{username}")
         say()
         return token, username
-    raise SetupAbort("Het token werkte niet na meerdere pogingen. Vraag in BotFather een nieuw token met /token.")
+    raise SetupAbort("Het token werkte niet. Typ in BotFather /token, kies je bot, en gebruik dat nieuwe token.")
 
 
 def step_find_user_id(token: str, bot_username: str, input_fn: Callable[[str], str]) -> int:
-    say("STAP 2 van 4 — Wie ben jij?")
+    heading(2, "Wie ben jij?")
     say("Ik moet weten wie de eigenaar is, zodat Sofia alleen met jou praat.")
-    say(f"Open Telegram, ga naar je bot: https://t.me/{bot_username}")
-    say("Druk op START (of typ: hallo) en stuur het. Ik wacht hier...")
+    say(f"Zoek in Telegram je bot: @{bot_username}")
+    say(f"(Of open deze link in je internetprogramma: https://t.me/{bot_username})")
+    say("Klik in dat gesprek op START. Zie je geen START? Typ dan: hallo")
+    say("Ik wacht hier op je bericht. Dit venster staat even stil. Dat is normaal.")
+    say("In Telegram gebeurt nu nog niets. Dat is ook normaal.")
     telegram_get(token, "deleteWebhook", {"drop_pending_updates": "false"})
     offset = 0
+    failures = 0
     deadline = time.monotonic() + 600
     while time.monotonic() < deadline:
-        updates = telegram_get(
-            token, "getUpdates", {"timeout": 25, "offset": offset, "allowed_updates": '["message"]'}, timeout=35
-        )
+        try:
+            updates = telegram_get(
+                token, "getUpdates", {"timeout": 25, "offset": offset, "allowed_updates": '["message"]'}, timeout=35
+            )
+            failures = 0
+        except TelegramBusy:
+            raise
+        except SetupAbort:
+            failures += 1  # a short Wi-Fi hiccup shouldn't end the whole setup
+            if failures >= 5:
+                raise
+            time.sleep(5)
+            continue
         for update in updates or []:
             offset = int(update["update_id"]) + 1
             message = update.get("message") or {}
@@ -196,13 +303,12 @@ def step_find_user_id(token: str, bot_username: str, input_fn: Callable[[str], s
             handle = f" (@{user['username']})" if user.get("username") else ""
             say(f"   Bericht ontvangen van {name}{handle}.")
             if ask_yes_no("   Ben jij dit?", True, input_fn):
-                # Mark the message as handled so the bot doesn't answer it later.
-                telegram_get(token, "getUpdates", {"offset": offset, "timeout": 0})
-                say(f"   ✓ Jouw Telegram-nummer (ID) is {user['id']}. Alleen jij komt erin.")
+                drop_pending(token)
+                say(f"   ✓ Jouw Telegram-nummer (ID) is {user['id']}. Alleen jij kunt met Sofia praten.")
                 say()
                 return int(user["id"])
             say("   Oké, dan wacht ik op een bericht van jou...")
-    raise SetupAbort("Ik heb 10 minuten geen bericht ontvangen. Start het opnieuw en stuur je bot een berichtje.")
+    raise SetupAbort("Ik heb 10 minuten geen bericht ontvangen. Sluit dit venster. Start Sofia opnieuw en klik op START bij je bot.")
 
 
 # --------------------------------------------------------------------------- OpenAI
@@ -212,11 +318,18 @@ def _openai_client(api_key: str) -> Any:
     return OpenAI(api_key=api_key, timeout=60, max_retries=1)
 
 
-def list_models(client: Any) -> set[str] | None:
+def validate_key(client: Any) -> tuple[bool, set[str] | None]:
+    """Returns (key accepted, available model ids or None if the key can't list models)."""
+    import openai
+
     try:
-        return {m.id for m in client.models.list()}
-    except Exception:
-        return None
+        return True, {m.id for m in client.models.list()}
+    except openai.AuthenticationError:
+        return False, None
+    except openai.APIConnectionError as exc:
+        raise SetupAbort("Ik kan OpenAI niet bereiken. Controleer je internetverbinding.") from exc
+    except openai.OpenAIError:
+        return True, None  # e.g. a restricted key without the "models" permission
 
 
 def test_chat_model(client: Any, model: str) -> tuple[bool, str | None, str]:
@@ -244,54 +357,64 @@ def test_chat_model(client: Any, model: str) -> tuple[bool, str | None, str]:
             client.responses.create(**kwargs)
             return True, effort, ""
         except openai.AuthenticationError as exc:
-            raise SetupAbort("OpenAI kent deze sleutel niet. Maak een nieuwe sleutel en plak die.") from exc
+            raise SetupAbort("OpenAI kent deze sleutel niet. Maak een nieuwe sleutel (handleiding Deel C).") from exc
         except openai.RateLimitError as exc:
             if "quota" in str(exc).lower():
                 raise SetupAbort(
-                    "Je OpenAI-account heeft geen tegoed. Ga naar platform.openai.com → Billing en voeg tegoed toe. "
-                    "(Een ChatGPT Plus-abonnement telt hier niet mee.) Wacht daarna 5 minuten en probeer opnieuw."
+                    "Je OpenAI-account heeft geen tegoed. Ga naar platform.openai.com en voeg tegoed toe "
+                    "(handleiding Deel C). Een ChatGPT Plus-abonnement telt hier niet mee. "
+                    "Wacht daarna 5 minuten en start opnieuw."
                 ) from exc
-            return False, None, "te druk (rate limit)"
+            return False, None, "het is nu te druk bij OpenAI"
         except openai.BadRequestError as exc:
             if effort and "reasoning" in str(exc).lower():
-                continue  # model doesn't take a reasoning setting: try without
-            return False, None, str(exc)[:160]
+                continue  # this model doesn't take a reasoning setting: try without
+            return False, None, "werkt niet met jouw account"
         except (openai.NotFoundError, openai.PermissionDeniedError) as exc:
-            return False, None, "geen toegang tot dit model" + (
-                " (mogelijk moet je organisatie geverifieerd zijn)" if "verif" in str(exc).lower() else ""
-            )
+            if "verif" in str(exc).lower():
+                return False, None, "werkt pas als je account geverifieerd is"
+            return False, None, "werkt niet met jouw account"
         except openai.APIConnectionError as exc:
             raise SetupAbort("Ik kan OpenAI niet bereiken. Controleer je internetverbinding.") from exc
-        except openai.OpenAIError as exc:
-            return False, None, str(exc)[:160]
-    return False, None, "werkt niet"
+        except openai.OpenAIError:
+            return False, None, "werkt niet met jouw account"
+    return False, None, "werkt niet met jouw account"
 
 
-def step_openai(input_fn: Callable[[str], str]) -> dict[str, str]:
-    say("STAP 3 van 4 — OpenAI")
-    say("Plak je OpenAI-sleutel (begint met sk-) en druk op Enter.")
+def ask_openai_key(input_fn: Callable[[str], str]) -> tuple[str, Any, set[str] | None]:
+    heading(3, "Je OpenAI-sleutel")
+    say("Plak je OpenAI-sleutel (begint met sk-). Druk daarna op Enter.")
     for _ in range(5):
-        key = clean_paste(ask("Sleutel: ", input_fn))
-        if looks_like_openai_key(key):
-            break
-        say("   Dat lijkt geen OpenAI-sleutel. Hij begint met sk- en is heel lang.")
-    else:
-        raise SetupAbort("Geen geldige sleutel ingevoerd.")
+        key = pick(KEY_SEARCH, ask("Sleutel: ", input_fn))
+        clear_screen()
+        banner()
+        heading(3, "Je OpenAI-sleutel")
+        if not looks_like_openai_key(key):
+            say("   Dat lijkt geen OpenAI-sleutel. Hij begint met sk- en is heel lang. Plak hem nog een keer.")
+            continue
+        say(f"   Sleutel ontvangen ({mask(key)}). Ik controleer hem...")
+        client = _openai_client(key)
+        accepted, available = validate_key(client)
+        if not accepted:
+            say("   OpenAI kent deze sleutel niet. Kopieer hem nog een keer HELEMAAL en plak hem hier.")
+            continue
+        return key, client, available
+    raise SetupAbort("Geen werkende sleutel. Maak een nieuwe sleutel (handleiding Deel C) en start opnieuw.")
 
-    client = _openai_client(key)
-    say("   Even testen welk model jouw account kan gebruiken (kan een halve minuut duren)...")
-    available = list_models(client)
+
+def choose_models(client: Any, available: set[str] | None) -> dict[str, str]:
+    say("   Even testen welke AI-versie (model) jouw account mag gebruiken. Dit kan een halve minuut duren...")
     chat_model, effort = None, None
     for model in candidate_chat_models(available):
         works, effort, problem = test_chat_model(client, model)
         if works:
             chat_model = model
             break
-        say(f"   - {model}: {problem}")
+        say(f"   - {model}: {problem}. Geen probleem, ik probeer de volgende...")
     if chat_model is None:
         raise SetupAbort(
-            "Geen enkel geschikt model werkte met deze sleutel. Controleer op platform.openai.com of je tegoed "
-            "hebt en of je organisatie geverifieerd is (Settings → Organization)."
+            "Geen enkele AI-versie werkte met deze sleutel. Controleer of je tegoed hebt. Kijk ook of je je "
+            "OpenAI-account moet verifiëren (handleiding: Lukt het niet?)."
         )
     say(f"   ✓ Sofia gebruikt: {chat_model}")
 
@@ -312,7 +435,6 @@ def step_openai(input_fn: Callable[[str], str]) -> dict[str, str]:
     say("   ✓ OpenAI werkt.")
     say()
     return {
-        "OPENAI_API_KEY": key,
         "LLM_PROVIDER": "openai",
         "LLM_MODEL": chat_model,
         "LLM_REASONING_EFFORT": effort or "",
@@ -322,50 +444,112 @@ def step_openai(input_fn: Callable[[str], str]) -> dict[str, str]:
     }
 
 
-# --------------------------------------------------------------------------- main
-def check_private_files() -> None:
-    missing = [n for n in ("persona.private.yaml", "user_profile.private.yaml") if not (PERSONA_DIR / n).exists()]
+# --------------------------------------------------------------------------- private files
+def open_folder(path: Path) -> None:
+    try:
+        if os.name == "nt":
+            os.startfile(path)  # type: ignore[attr-defined]
+        elif sys.platform == "darwin":
+            subprocess.run(["open", str(path)], check=False)
+    except OSError:
+        pass
+
+
+def fix_private_files() -> list[str]:
+    """Move misnamed or misplaced private files into persona/. Returns names still missing."""
+    folders = [PERSONA_DIR, ROOT, Path.home() / "Downloads"]
+    missing = []
+    for name in PRIVATE_FILES:
+        target = PERSONA_DIR / name
+        if target.exists():
+            continue
+        found = find_misnamed(name, folders)
+        if found is not None:
+            PERSONA_DIR.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(found), str(target))
+            say(f"   ✓ {found.name} gevonden en neergezet als persona/{name}")
+        else:
+            missing.append(name)
+    return missing
+
+
+def check_private_files(input_fn: Callable[[str], str], interactive: bool) -> None:
+    missing = fix_private_files()
+    if missing and interactive:
+        say("   Let op: deze privé-bestanden ontbreken nog:")
+        for name in missing:
+            say(f"     - {name}")
+        say("   Ik open nu de map 'persona'. Zet de bestanden daarin (zie handleiding, Deel E).")
+        open_folder(PERSONA_DIR)
+        ask("   Klaar? Druk op Enter. (Wil je zonder verder? Druk ook gewoon op Enter.) ", input_fn)
+        missing = fix_private_files()
     if not missing:
         say("   ✓ Je privé-bestanden staan op hun plek.")
-        return
-    say("   Let op: deze privé-bestanden ontbreken nog in de map 'persona':")
-    for name in missing:
-        say(f"     - {name}")
-    say("   Sofia werkt ook zonder, maar mist dan je persoonlijke instellingen.")
-    say(f"   Zet ze in: {PERSONA_DIR}  en start daarna opnieuw.")
+    else:
+        say("   Sofia start zonder je privé-bestanden. Dat kan; je kunt ze later toevoegen (handleiding, Deel E).")
 
 
-def run(input_fn: Callable[[str], str] = input) -> int:
-    say()
-    say("=" * 60)
-    say("  Sofia — eerste keer instellen")
-    say("=" * 60)
+# --------------------------------------------------------------------------- main
+def run(input_fn: Callable[[str], str] = input, *, interactive: bool | None = None) -> int:
+    if interactive is None:
+        interactive = sys.stdin.isatty()
+    banner()
     say("Ik stel je 3 vragen. Na elke vraag controleer ik meteen of het klopt.")
     say()
+    token = ""
     try:
         existing = parse_env(ENV_PATH.read_text(encoding="utf-8")) if ENV_PATH.exists() else {}
-        if existing and not ask_yes_no("Er zijn al instellingen. Opnieuw instellen?", False, input_fn):
+        if existing and not ask_yes_no("Er zijn al instellingen. Opnieuw instellen?", True, input_fn):
             say("Niets veranderd.")
             return 0
-        token, bot_username = step_telegram_token(input_fn)
-        user_id = step_find_user_id(token, bot_username, input_fn)
-        openai_values = step_openai(input_fn)
 
-        say("STAP 4 van 4 — Opslaan")
+        # Telegram (questions 1 and 2) — can be kept when redoing the setup.
+        token, bot_username, user_id = "", "", 0
+        old_token, old_id = existing.get("TELEGRAM_BOT_TOKEN", ""), existing.get("ALLOWED_TELEGRAM_USER_ID", "")
+        if old_token and old_id.isdigit() and ask_yes_no("Je Telegram-instellingen hetzelfde laten?", True, input_fn):
+            username = check_existing_token(old_token)
+            if username:
+                token, bot_username, user_id = old_token, username, int(old_id)
+                say(f"   ✓ Telegram blijft hetzelfde (@{username}).")
+                say()
+            else:
+                say("   Het oude token werkt niet meer. We doen het opnieuw.")
+        if not token:
+            token, bot_username = step_telegram_token(input_fn)
+            user_id = step_find_user_id(token, bot_username, input_fn)
+
+        # OpenAI (question 3) — the key can be kept; the model check always runs again.
+        old_key = existing.get("OPENAI_API_KEY", "")
+        client, available, key = None, None, ""
+        if old_key and ask_yes_no("Je OpenAI-sleutel hetzelfde laten?", True, input_fn):
+            heading(3, "Je OpenAI-sleutel")
+            client = _openai_client(old_key)
+            accepted, available = validate_key(client)
+            if accepted:
+                key = old_key
+            else:
+                say("   De oude sleutel werkt niet meer. Plak een nieuwe.")
+        if not key:
+            key, client, available = ask_openai_key(input_fn)
+        model_values = choose_models(client, available)
+
+        say("Alles klopt. Ik sla het nu op...")
+        drop_pending(token)  # anything typed to the bot during setup is not a conversation
         values = {
             **existing,
             "TELEGRAM_BOT_TOKEN": token,
             "ALLOWED_TELEGRAM_USER_ID": str(user_id),
-            **openai_values,
+            "OPENAI_API_KEY": key,
+            **model_values,
         }
         template = TEMPLATE_PATH.read_text(encoding="utf-8") if TEMPLATE_PATH.exists() else ""
         if ENV_PATH.exists():
             shutil.copyfile(ENV_PATH, ENV_PATH.with_name(".env.backup"))
         ENV_PATH.write_text(render_env(template, values), encoding="utf-8")
         say("   ✓ Instellingen opgeslagen (in het bestand .env — deel dat met niemand).")
-        check_private_files()
+        check_private_files(input_fn, interactive)
         say()
-        say("Klaar! Sofia kan nu starten.")
+        say("Klaar! Sofia start nu.")
         say()
         return 0
     except SetupAbort as exc:

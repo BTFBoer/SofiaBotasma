@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import httpx
+import openai
 import pytest
 
 from app import setup_wizard as wiz
 
 TOKEN = "1234567890:AAH" + "x" * 32
+KEY = "sk-proj-" + "a" * 40
 
 
 def test_clean_paste_removes_accidental_characters():
@@ -16,11 +19,18 @@ def test_clean_paste_removes_accidental_characters():
     assert wiz.clean_paste("sk-abc​def ghi") == "sk-abcdefghi"
 
 
+def test_pick_finds_codes_inside_labels():
+    assert wiz.pick(wiz.TOKEN_SEARCH, f"Telegram-token: {TOKEN}") == TOKEN
+    assert wiz.pick(wiz.KEY_SEARCH, f"OpenAI-sleutel {KEY}") == KEY
+    assert wiz.pick(wiz.TOKEN_SEARCH, "hallo") == "hallo"
+
+
 def test_token_and_key_shapes():
     assert wiz.looks_like_bot_token(TOKEN)
     assert not wiz.looks_like_bot_token("hallo")
-    assert wiz.looks_like_openai_key("sk-proj-" + "a" * 40)
+    assert wiz.looks_like_openai_key(KEY)
     assert not wiz.looks_like_openai_key("pk-123")
+    assert TOKEN not in wiz.mask(TOKEN) and KEY not in wiz.mask(KEY)
 
 
 def test_render_env_fills_template_and_keeps_comments():
@@ -36,96 +46,147 @@ def test_render_env_fills_template_and_keeps_comments():
 def test_model_candidates_follow_what_the_account_has():
     assert wiz.candidate_chat_models(None)[0] == wiz.PREFERRED_CHAT_MODELS[0]
     assert wiz.candidate_chat_models({"gpt-5.5", "gpt-5.4", "whisper-1"}) == ["gpt-5.5", "gpt-5.4"]
-    odd = wiz.candidate_chat_models({"gpt-7-nova", "gpt-7-nova-realtime", "dall-e-3"})
-    assert odd == ["gpt-7-nova"]
+    odd = wiz.candidate_chat_models({"gpt-7-nova", "gpt-7-nova-pro", "gpt-7-nova-mini", "gpt-7-nova-realtime"})
+    assert odd == ["gpt-7-nova", "gpt-7-nova-mini"]  # no -pro, small models last
     assert wiz.candidate_utility_models({"gpt-5.4-mini"}, "gpt-5.5") == ["gpt-5.4-mini", "gpt-5.5"]
 
 
+def test_find_misnamed_private_files(tmp_path, monkeypatch):
+    persona = tmp_path / "persona"
+    persona.mkdir()
+    downloads = tmp_path / "Downloads"
+    downloads.mkdir()
+    monkeypatch.setattr(wiz, "PERSONA_DIR", persona)
+    (persona / "user_profile.private.example.yaml").write_text("x")
+    (downloads / "persona.private (1).yaml").write_text("x")
+    (downloads / "user_profile.private.yaml.txt").write_text("x")
+    assert wiz.find_misnamed("persona.private.yaml", [persona, downloads]).name == "persona.private (1).yaml"
+    assert wiz.find_misnamed("user_profile.private.yaml", [persona, downloads]).name == "user_profile.private.yaml.txt"
+    assert wiz.find_misnamed("user_profile.private.yaml", [persona]) is None  # the example file is ignored
+
+
 class FakeOpenAI:
-    def __init__(self, models: set[str], working: set[str]) -> None:
-        self._models = models
+    def __init__(self, models: set[str], working: set[str], *, valid: bool = True) -> None:
         self._working = working
-        self.models = SimpleNamespace(list=lambda: [SimpleNamespace(id=m) for m in models])
+        self._valid = valid
+        self.models = SimpleNamespace(list=self._list)
+        self._models = models
         self.responses = SimpleNamespace(create=self._create)
         self.embeddings = SimpleNamespace(create=lambda **kw: SimpleNamespace(data=[]))
 
-    def _create(self, **kwargs):
-        import httpx
-        import openai
+    @staticmethod
+    def _error(cls, status: int, message: str):
+        request = httpx.Request("POST", "https://api.openai.com/v1/x")
+        return cls(message, response=httpx.Response(status, request=request), body=None)
 
+    def _list(self):
+        if not self._valid:
+            raise self._error(openai.AuthenticationError, 401, "invalid key")
+        return [SimpleNamespace(id=m) for m in self._models]
+
+    def _create(self, **kwargs):
         if kwargs["model"] not in self._working:
-            request = httpx.Request("POST", "https://api.openai.com/v1/responses")
-            raise openai.NotFoundError("model not found", response=httpx.Response(404, request=request), body=None)
+            raise self._error(openai.NotFoundError, 404, "model not found")
         return SimpleNamespace(output_text='{"ok": true}')
 
 
-def test_full_setup_flow_writes_env(tmp_path, monkeypatch):
-    env_path = tmp_path / ".env"
-    (tmp_path / ".env.example").write_text(
-        "TELEGRAM_BOT_TOKEN=\nALLOWED_TELEGRAM_USER_ID=\nOPENAI_API_KEY=\nLLM_MODEL=\nLLM_REASONING_EFFORT=low\n",
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(wiz, "ENV_PATH", env_path)
-    monkeypatch.setattr(wiz, "TEMPLATE_PATH", tmp_path / ".env.example")
-    monkeypatch.setattr(wiz, "PERSONA_DIR", tmp_path / "persona")
+class FakeTelegram:
+    def __init__(self) -> None:
+        self.dropped = 0
 
-    acked = {}
-
-    def fake_telegram(token, method, params=None, timeout=15.0):
+    def __call__(self, token, method, params=None, timeout=15.0):
         if token != TOKEN:
             return None
         if method == "getMe":
             return {"username": "sofia_test_bot"}
         if method == "deleteWebhook":
+            if params and params.get("drop_pending_updates") == "true":
+                self.dropped += 1
             return True
         if method == "getUpdates":
-            if params.get("timeout") == 0:
-                acked["offset"] = params["offset"]
-                return []
             return [
                 {"update_id": 7, "message": {"chat": {"type": "private"},
-                                             "from": {"id": 4242, "first_name": "Bram", "username": "bbtf1023"}}}
+                                             "from": {"id": 4242, "first_name": "Bram", "username": "bram"}}}
             ]
         raise AssertionError(method)
 
-    monkeypatch.setattr(wiz, "telegram_get", fake_telegram)
-    monkeypatch.setattr(
-        wiz, "_openai_client", lambda key: FakeOpenAI({"gpt-5.5", "gpt-5.4-mini", "text-embedding-3-small"},
-                                                      {"gpt-5.5", "gpt-5.4-mini"})
-    )
-    answers = iter(["not a token", f"  {TOKEN} ", "j", "sk-proj-" + "a" * 40])
-    assert wiz.run(input_fn=lambda _prompt: next(answers)) == 0
 
-    values = wiz.parse_env(env_path.read_text(encoding="utf-8"))
+@pytest.fixture
+def paths(tmp_path, monkeypatch):
+    (tmp_path / ".env.example").write_text(
+        "TELEGRAM_BOT_TOKEN=\nALLOWED_TELEGRAM_USER_ID=\nOPENAI_API_KEY=\nLLM_MODEL=\nLLM_REASONING_EFFORT=low\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(wiz, "ENV_PATH", tmp_path / ".env")
+    monkeypatch.setattr(wiz, "TEMPLATE_PATH", tmp_path / ".env.example")
+    monkeypatch.setattr(wiz, "PERSONA_DIR", tmp_path / "persona")
+    monkeypatch.setattr(wiz, "ROOT", tmp_path)
+    monkeypatch.setattr(wiz.Path, "home", staticmethod(lambda: tmp_path / "home"))
+    return tmp_path
+
+
+def run_with(answers):
+    it = iter(answers)
+    return wiz.run(input_fn=lambda _prompt: next(it), interactive=False)
+
+
+def test_full_setup_flow_writes_env(paths, monkeypatch):
+    telegram = FakeTelegram()
+    monkeypatch.setattr(wiz, "telegram_get", telegram)
+    clients = iter([
+        FakeOpenAI(set(), set(), valid=False),  # first paste: wrong key → asked again, no restart needed
+        FakeOpenAI({"gpt-5.5", "gpt-5.4-mini", "text-embedding-3-small"}, {"gpt-5.5", "gpt-5.4-mini"}),
+    ])
+    monkeypatch.setattr(wiz, "_openai_client", lambda key: next(clients))
+    assert run_with(["not a token", f"Telegram-token: {TOKEN}", "j", "sk-proj-wrongwrongwrongwrong", KEY]) == 0
+
+    values = wiz.parse_env((paths / ".env").read_text(encoding="utf-8"))
     assert values["TELEGRAM_BOT_TOKEN"] == TOKEN
     assert values["ALLOWED_TELEGRAM_USER_ID"] == "4242"
+    assert values["OPENAI_API_KEY"] == KEY
     assert values["LLM_MODEL"] == "gpt-5.5"
     assert values["UTILITY_MODEL"] == "gpt-5.4-mini"
     assert values["EMBEDDING_MODEL"] == "text-embedding-3-small"
     assert values["LLM_REASONING_EFFORT"] == "low"
-    assert acked["offset"] == 8  # the hello message is marked handled
+    assert telegram.dropped >= 2  # setup messages are thrown away, so Sofia won't answer them later
 
 
-def test_setup_stops_cleanly_without_credit(tmp_path, monkeypatch):
-    import httpx
-    import openai
+def test_redo_setup_can_keep_existing_codes(paths, monkeypatch):
+    (paths / ".env").write_text(
+        f"TELEGRAM_BOT_TOKEN={TOKEN}\nALLOWED_TELEGRAM_USER_ID=4242\nOPENAI_API_KEY={KEY}\nLLM_MODEL=old\nTIMEZONE=Europe/Amsterdam\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(wiz, "telegram_get", FakeTelegram())
+    monkeypatch.setattr(wiz, "_openai_client", lambda key: FakeOpenAI({"gpt-5.4"}, {"gpt-5.4"}))
+    assert run_with(["j", "j", "j"]) == 0  # redo? keep Telegram? keep key?
+    values = wiz.parse_env((paths / ".env").read_text(encoding="utf-8"))
+    assert values["LLM_MODEL"] == "gpt-5.4"  # model re-checked
+    assert values["ALLOWED_TELEGRAM_USER_ID"] == "4242"
+    assert (paths / ".env.backup").exists()
 
-    monkeypatch.setattr(wiz, "ENV_PATH", tmp_path / ".env")
-    monkeypatch.setattr(wiz, "TEMPLATE_PATH", tmp_path / "missing.example")
-    monkeypatch.setattr(wiz, "telegram_get", lambda *a, **k: (
-        {"username": "b"} if a[1] == "getMe" else True if a[1] == "deleteWebhook" else (
-            [] if (k.get("params") or (a[2] if len(a) > 2 else {})).get("timeout") == 0 else
-            [{"update_id": 1, "message": {"chat": {"type": "private"}, "from": {"id": 1, "first_name": "B"}}}])))
+
+def test_setup_stops_cleanly_without_credit(paths, monkeypatch):
+    monkeypatch.setattr(wiz, "telegram_get", FakeTelegram())
 
     class NoCredit(FakeOpenAI):
         def _create(self, **kwargs):
-            request = httpx.Request("POST", "https://api.openai.com/v1/responses")
-            raise openai.RateLimitError("You exceeded your current quota", response=httpx.Response(429, request=request), body=None)
+            raise self._error(openai.RateLimitError, 429, "You exceeded your current quota")
 
     monkeypatch.setattr(wiz, "_openai_client", lambda key: NoCredit(set(), set()))
-    answers = iter([TOKEN, "j", "sk-proj-" + "b" * 40])
-    assert wiz.run(input_fn=lambda _p: next(answers)) == 1
-    assert not (tmp_path / ".env").exists()
+    assert run_with([TOKEN, "j", KEY]) == 1
+    assert not (paths / ".env").exists()
+
+
+def test_running_bot_gives_clear_message(paths, monkeypatch):
+    def busy(token, method, params=None, timeout=15.0):
+        if method == "getMe":
+            return {"username": "b"}
+        if method == "deleteWebhook":
+            return True
+        raise wiz.TelegramBusy("Sofia draait nog in een ander venster.")
+
+    monkeypatch.setattr(wiz, "telegram_get", busy)
+    assert run_with([TOKEN]) == 1
 
 
 @pytest.mark.parametrize("answer,expected", [("", True), ("J", True), ("nee", False)])

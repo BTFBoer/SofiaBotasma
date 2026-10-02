@@ -39,8 +39,19 @@ class TextFormatter(logging.Formatter):
         return base
 
 
+class _QuietNetworkRetries(logging.Filter):
+    """python-telegram-bot logs a full traceback for every failed network retry; one line is enough."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.name.startswith("telegram") and "Network Retry Loop" in record.getMessage():
+            record.exc_info = None
+            record.exc_text = None
+        return True
+
+
 def setup_logging(level: str = "INFO", fmt: str = "text") -> None:
     handler = logging.StreamHandler(sys.stdout)
+    handler.addFilter(_QuietNetworkRetries())
     if fmt == "json":
         handler.setFormatter(JsonFormatter())
     else:
@@ -49,7 +60,7 @@ def setup_logging(level: str = "INFO", fmt: str = "text") -> None:
     root.handlers[:] = [handler]
     root.setLevel(level)
     # Third-party libraries are chatty at INFO (every HTTP request).
-    for noisy in ("httpx", "httpcore", "telegram", "apscheduler", "openai"):
+    for noisy in ("httpx", "httpcore", "httpx2", "httpcore2", "telegram", "apscheduler", "openai"):
         logging.getLogger(noisy).setLevel(max(logging.WARNING, logging.getLevelName(level)))
 
 

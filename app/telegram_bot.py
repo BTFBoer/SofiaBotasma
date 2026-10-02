@@ -209,7 +209,8 @@ class SofiaBot:
                 allowed_updates=allowed,
             )
         else:
-            app.run_polling(allowed_updates=allowed, drop_pending_updates=False)
+            # A few retries at startup: a laptop's Wi-Fi is often still connecting.
+            app.run_polling(allowed_updates=allowed, drop_pending_updates=False, bootstrap_retries=4)
 
     # ================================================================== gate
     async def _gate(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

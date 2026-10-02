@@ -32,9 +32,13 @@ STOP_INVALID_TOKEN = (
     "Doe 'Instellingen opnieuw doen' uit de handleiding en plak een nieuw token "
     "(in BotFather: /token).\n"
 )
+STOP_BROKEN_PRIVATE = (
+    "\nSTOP: Een privé-bestand in de map persona klopt niet. Sleep persona.private.yaml en "
+    "user_profile.private.yaml uit de map persona naar je bureaublad, start Sofia opnieuw, "
+    "en vraag Claude om nieuwe versies.\n"
+)
 STOP_NO_TELEGRAM = (
-    "\nSTOP: Ik kan Telegram niet bereiken. Controleer je internetverbinding "
-    "en start Sofia daarna opnieuw.\n"
+    "\nSTOP: Ik kan Telegram niet bereiken. Controleer je internetverbinding en start Sofia daarna opnieuw.\n"
 )
 
 
@@ -88,6 +92,8 @@ def main(argv: list[str] | None = None) -> int:
         persona, profile, files = load_persona_bundle(settings.persona_dir)
     except PersonaError as exc:
         print(f"Persona error: {exc}", file=sys.stderr)
+        if ".private" in str(exc):
+            print(STOP_BROKEN_PRIVATE, file=sys.stderr)
         return 2
     log.info("persona loaded", extra={"files": ", ".join(str(f.name) for f in files)})
 

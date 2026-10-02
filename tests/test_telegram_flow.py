@@ -87,3 +87,15 @@ async def test_llm_outage_sends_neutral_message_not_a_stack_trace(bot, engine, p
     (text,) = [c.args[1] for c in bot.app.bot.send_message.await_args_list]
     assert "Traceback" not in text and "Error" not in text
     assert "glitch" in text or "again" in text
+
+
+async def test_polling_hiccups_are_one_calm_line(bot, caplog):
+    from telegram.error import Conflict, NetworkError
+
+    with caplog.at_level("WARNING"):
+        await bot._on_error(None, SimpleNamespace(error=NetworkError("httpx.ConnectError")))
+        await bot._on_error(None, SimpleNamespace(error=Conflict("terminated by other getUpdates request")))
+        await bot._on_error(None, SimpleNamespace(error=Conflict("terminated by other getUpdates request")))
+    assert not any(r.exc_info for r in caplog.records)
+    assert sum("ander venster" in r.getMessage() for r in caplog.records) == 1  # not repeated every few seconds
+    assert any("niet bereikbaar" in r.getMessage() for r in caplog.records)

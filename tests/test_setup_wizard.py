@@ -105,8 +105,13 @@ class FakeTelegram:
             return True
         if method == "getUpdates":
             return [
-                {"update_id": 7, "message": {"chat": {"type": "private"},
-                                             "from": {"id": 4242, "first_name": "Bram", "username": "bram"}}}
+                {
+                    "update_id": 7,
+                    "message": {
+                        "chat": {"type": "private"},
+                        "from": {"id": 4242, "first_name": "Bram", "username": "bram"},
+                    },
+                }
             ]
         raise AssertionError(method)
 
@@ -133,10 +138,12 @@ def run_with(answers):
 def test_full_setup_flow_writes_env(paths, monkeypatch):
     telegram = FakeTelegram()
     monkeypatch.setattr(wiz, "telegram_get", telegram)
-    clients = iter([
-        FakeOpenAI(set(), set(), valid=False),  # first paste: wrong key → asked again, no restart needed
-        FakeOpenAI({"gpt-5.5", "gpt-5.4-mini", "text-embedding-3-small"}, {"gpt-5.5", "gpt-5.4-mini"}),
-    ])
+    clients = iter(
+        [
+            FakeOpenAI(set(), set(), valid=False),  # first paste: wrong key → asked again, no restart needed
+            FakeOpenAI({"gpt-5.5", "gpt-5.4-mini", "text-embedding-3-small"}, {"gpt-5.5", "gpt-5.4-mini"}),
+        ]
+    )
     monkeypatch.setattr(wiz, "_openai_client", lambda key: next(clients))
     assert run_with(["not a token", f"Telegram-token: {TOKEN}", "j", "sk-proj-wrongwrongwrongwrong", KEY]) == 0
 
@@ -192,3 +199,25 @@ def test_running_bot_gives_clear_message(paths, monkeypatch):
 @pytest.mark.parametrize("answer,expected", [("", True), ("J", True), ("nee", False)])
 def test_yes_no(answer, expected):
     assert wiz.ask_yes_no("?", True, input_fn=lambda _p: answer) is expected
+
+
+def test_broken_private_file_is_not_adopted(paths, monkeypatch):
+    downloads = paths / "home" / "Downloads"
+    downloads.mkdir(parents=True)
+    (downloads / "persona.private.yaml").write_text("static_core:\n  note: tijd: 9:00\n", encoding="utf-8")
+    (downloads / "user_profile.private (1).yaml").write_text("intimate_profile:\n  general: {}\n", encoding="utf-8")
+    missing = wiz.fix_private_files()
+    assert missing == ["persona.private.yaml"]
+    assert (paths / "persona" / "user_profile.private.yaml").exists()
+    assert not (paths / "persona" / "persona.private.yaml").exists()
+
+
+def test_keeping_telegram_does_not_drop_offline_messages(paths, monkeypatch):
+    (paths / ".env").write_text(
+        f"TELEGRAM_BOT_TOKEN={TOKEN}\nALLOWED_TELEGRAM_USER_ID=4242\nOPENAI_API_KEY={KEY}\n", encoding="utf-8"
+    )
+    telegram = FakeTelegram()
+    monkeypatch.setattr(wiz, "telegram_get", telegram)
+    monkeypatch.setattr(wiz, "_openai_client", lambda key: FakeOpenAI({"gpt-5.4"}, {"gpt-5.4"}))
+    assert run_with(["j", "j", "j"]) == 0
+    assert telegram.dropped == 0

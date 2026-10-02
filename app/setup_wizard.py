@@ -12,7 +12,6 @@ from __future__ import annotations
 import os
 import re
 import shutil
-import subprocess
 import sys
 import time
 from collections.abc import Callable
@@ -125,7 +124,9 @@ def candidate_chat_models(available: set[str] | None) -> list[str]:
     preferred = [m for m in PREFERRED_CHAT_MODELS if m in available]
     if preferred:
         return preferred
-    generic = sorted((m for m in available if m.startswith("gpt-") and not any(x in m for x in _NOT_CHAT)), reverse=True)
+    generic = sorted(
+        (m for m in available if m.startswith("gpt-") and not any(x in m for x in _NOT_CHAT)), reverse=True
+    )
     small = [m for m in generic if "mini" in m or "nano" in m]
     return ([m for m in generic if m not in small] + small)[:6]
 
@@ -221,9 +222,7 @@ def telegram_get(token: str, method: str, params: dict[str, Any] | None = None, 
     if response.status_code == 401 or data.get("error_code") == 401:
         return None
     if response.status_code == 409 or data.get("error_code") == 409:
-        raise TelegramBusy(
-            "Sofia draait nog in een ander venster. Sluit dat venster eerst. Start daarna opnieuw."
-        )
+        raise TelegramBusy("Sofia draait nog in een ander venster. Sluit dat venster eerst. Start daarna opnieuw.")
     if not data.get("ok"):
         raise SetupAbort(f"Telegram gaf een foutmelding: {data.get('description', response.status_code)}")
     return data["result"]
@@ -252,7 +251,9 @@ def step_telegram_token(input_fn: Callable[[str], str]) -> tuple[str, str]:
         banner()
         heading(1, "Je Telegram-token")
         if not looks_like_bot_token(token):
-            say("   Dat lijkt geen Telegram-token. Het ziet eruit als 1234567890:AAH... (cijfers, dubbele punt, letters).")
+            say(
+                "   Dat lijkt geen Telegram-token. Het ziet eruit als 1234567890:AAH... (cijfers, dubbele punt, letters)."
+            )
             say("   Kopieer het nog een keer uit BotFather en plak het hier.")
             continue
         say(f"   Token ontvangen ({mask(token)}). Ik controleer het...")
@@ -308,7 +309,9 @@ def step_find_user_id(token: str, bot_username: str, input_fn: Callable[[str], s
                 say()
                 return int(user["id"])
             say("   Oké, dan wacht ik op een bericht van jou...")
-    raise SetupAbort("Ik heb 10 minuten geen bericht ontvangen. Sluit dit venster. Start Sofia opnieuw en klik op START bij je bot.")
+    raise SetupAbort(
+        "Ik heb 10 minuten geen bericht ontvangen. Sluit dit venster. Start Sofia opnieuw en klik op START bij je bot."
+    )
 
 
 # --------------------------------------------------------------------------- OpenAI
@@ -445,18 +448,22 @@ def choose_models(client: Any, available: set[str] | None) -> dict[str, str]:
 
 
 # --------------------------------------------------------------------------- private files
-def open_folder(path: Path) -> None:
+
+
+def valid_yaml(path: Path) -> bool:
+    import yaml
+
     try:
-        if os.name == "nt":
-            os.startfile(path)  # type: ignore[attr-defined]
-        elif sys.platform == "darwin":
-            subprocess.run(["open", str(path)], check=False)
-    except OSError:
-        pass
+        return isinstance(yaml.safe_load(path.read_text(encoding="utf-8")), dict)
+    except (OSError, UnicodeDecodeError, yaml.YAMLError):
+        return False
 
 
 def fix_private_files() -> list[str]:
-    """Move misnamed or misplaced private files into persona/. Returns names still missing."""
+    """Move misnamed or misplaced private files into persona/. Returns names still missing.
+
+    A broken file is never adopted: Sofia should start without it rather than not start at all.
+    """
     folders = [PERSONA_DIR, ROOT, Path.home() / "Downloads"]
     missing = []
     for name in PRIVATE_FILES:
@@ -464,6 +471,11 @@ def fix_private_files() -> list[str]:
         if target.exists():
             continue
         found = find_misnamed(name, folders)
+        if found is not None and not valid_yaml(found):
+            say(
+                f"   Let op: {found.name} is beschadigd. Sofia start zonder dit bestand. Vraag Claude om een nieuwe versie."
+            )
+            found = None
         if found is not None:
             PERSONA_DIR.mkdir(parents=True, exist_ok=True)
             shutil.move(str(found), str(target))
@@ -479,9 +491,12 @@ def check_private_files(input_fn: Callable[[str], str], interactive: bool) -> No
         say("   Let op: deze privé-bestanden ontbreken nog:")
         for name in missing:
             say(f"     - {name}")
-        say("   Ik open nu de map 'persona'. Zet de bestanden daarin (zie handleiding, Deel E).")
-        open_folder(PERSONA_DIR)
-        ask("   Klaar? Druk op Enter. (Wil je zonder verder? Druk ook gewoon op Enter.) ", input_fn)
+        say("   Download ze nu uit het gesprek met Claude (handleiding, Deel E, stap 6 en 7).")
+        say("   Laat ze gewoon in Downloads staan. Ik zet ze zelf op de goede plek.")
+        ask(
+            "   Klaar? Ga terug naar dit venster en druk op Enter. (Zonder verder? Druk ook gewoon op Enter.) ",
+            input_fn,
+        )
         missing = fix_private_files()
     if not missing:
         say("   ✓ Je privé-bestanden staan op hun plek.")
@@ -505,11 +520,13 @@ def run(input_fn: Callable[[str], str] = input, *, interactive: bool | None = No
 
         # Telegram (questions 1 and 2) — can be kept when redoing the setup.
         token, bot_username, user_id = "", "", 0
+        kept_telegram = False
         old_token, old_id = existing.get("TELEGRAM_BOT_TOKEN", ""), existing.get("ALLOWED_TELEGRAM_USER_ID", "")
         if old_token and old_id.isdigit() and ask_yes_no("Je Telegram-instellingen hetzelfde laten?", True, input_fn):
             username = check_existing_token(old_token)
             if username:
                 token, bot_username, user_id = old_token, username, int(old_id)
+                kept_telegram = True
                 say(f"   ✓ Telegram blijft hetzelfde (@{username}).")
                 say()
             else:
@@ -534,7 +551,8 @@ def run(input_fn: Callable[[str], str] = input, *, interactive: bool | None = No
         model_values = choose_models(client, available)
 
         say("Alles klopt. Ik sla het nu op...")
-        drop_pending(token)  # anything typed to the bot during setup is not a conversation
+        if not kept_telegram:
+            drop_pending(token)  # START/'hallo' typed during setup is not a conversation; offline messages are
         values = {
             **existing,
             "TELEGRAM_BOT_TOKEN": token,

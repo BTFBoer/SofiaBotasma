@@ -55,17 +55,8 @@ echo " Onderdelen installeren. De eerste keer kan dit 5 minuten duren."
 echo " Je ziet dan niets gebeuren. Dat is normaal."
 .venv/bin/python -m pip install --disable-pip-version-check --quiet -r requirements.txt || fail
 
-# 4. First-time questions (or forced with: bash start.sh --setup)
-if [ "${1:-}" = "--setup" ] || [ ! -f .env ]; then
-    if ! .venv/bin/python -m app --setup || [ ! -f .env ]; then
-        echo
-        echo " Het instellen is gestopt. Lees hierboven de regel die begint met STOP."
-        echo " Doe wat daar staat. Start Sofia daarna opnieuw (handleiding, Deel F)."
-        exit 1
-    fi
-fi
-
-# 5. Double-click launchers next to this script (macOS), so Terminal isn't needed next time.
+# 4. Double-click launchers next to this script (macOS), so Terminal isn't needed next time
+#    (made before the questions, so they exist even if the first setup fails).
 #    Created locally, so macOS doesn't treat them as downloaded files.
 if [ "$(uname)" = "Darwin" ]; then
     if [ ! -f "Sofia starten.command" ]; then
@@ -75,6 +66,20 @@ if [ "$(uname)" = "Darwin" ]; then
     if [ ! -f "Sofia opnieuw instellen.command" ]; then
         printf '#!/bin/bash\ncd "$(dirname "$0")" && bash start.sh --setup\n' > "Sofia opnieuw instellen.command" \
             && chmod +x "Sofia opnieuw instellen.command"
+    fi
+fi
+
+# 5. First-time questions (or forced with: bash start.sh --setup)
+if [ "${1:-}" = "--setup" ] || [ ! -f .env ]; then
+    if ! .venv/bin/python -m app --setup || [ ! -f .env ]; then
+        echo
+        echo " Het instellen is gestopt. Lees hierboven de regel die begint met STOP."
+        if [ "${1:-}" = "--setup" ]; then
+            echo " Doe wat daar staat. Dubbelklik daarna opnieuw op 'Sofia opnieuw instellen' in de Sofia-map."
+        else
+            echo " Doe wat daar staat. Dubbelklik daarna op 'Sofia starten' in de Sofia-map."
+        fi
+        exit 1
     fi
 fi
 

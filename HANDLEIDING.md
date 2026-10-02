@@ -14,6 +14,7 @@ Deze handleiding is voor iemand die **nog nooit** iets met programmeren heeft ge
 
 - Een **computer** met **Windows** of een **Mac**. Een tablet of telefoon werkt niet.
 - **Telegram** op je telefoon.
+- Een **e-mailadres** waar je nu bij kunt.
 - Een **betaalkaart** (creditcard of debitcard). Daarmee koop je vooraf tegoed bij OpenAI, bijvoorbeeld $10.
 - Een **notitie** om twee codes even in te bewaren.
   - Windows: het programma **Kladblok**.
@@ -37,7 +38,7 @@ Deze handleiding is voor iemand die **nog nooit** iets met programmeren heeft ge
 | **Bot** | Een automatisch Telegram-account. Sofia wordt zo'n bot. |
 | **Telegram-token** | Een lange geheime code van Telegram. Daarmee gebruikt Sofia jouw bot. |
 | **OpenAI-sleutel** | Een lange geheime code van OpenAI. Daarmee kan Sofia nadenken en antwoorden. |
-| **Screenshot** | Een foto van je scherm. Windows: druk tegelijk op **Windows-toets + Shift + S**. Mac: druk tegelijk op **Cmd + Shift + 4** en sleep over het venster. |
+| **Screenshot** | Een foto van je scherm. Windows: druk tegelijk op **Windows-toets + Shift + S**. Het scherm wordt grijs. Sleep met de muis over het venster. Plak de foto daarna in de chat met **Ctrl+V**. Mac: druk tegelijk op **Cmd + Shift + 4** en sleep over het venster. De foto staat dan op je bureaublad (*Schermafbeelding …*). Sleep die in de chat. |
 
 ---
 
@@ -113,7 +114,7 @@ Je moet straks een lange code kopiëren. Dat gaat het makkelijkst als Telegram o
 **Extra veiligheid (1 minuut):**
 
 14. Ga terug naar BotFather. Typ: **/setjoingroups** en druk op **Enter**.
-15. Klik op de naam van je nieuwe bot.
+15. Klik op de knop met de gebruikersnaam van je bot, bijvoorbeeld **@sofia_bram_2026_bot** (die staat in je notitie).
 16. Klik op **Disable** (uitzetten).
 
 ✔️ **Je ziet:** *"Success! The new status is: DISABLED."* Nu kan niemand je bot aan een groep toevoegen.
@@ -126,7 +127,10 @@ Je moet straks een lange code kopiëren. Dat gaat het makkelijkst als Telegram o
 > Je koopt hier vooraf tegoed. Sofia gebruikt per bericht een heel klein beetje daarvan.
 
 1. Ga naar **https://platform.openai.com**
-2. Klik op **Sign up** (aanmelden). Heb je al een account bij OpenAI of ChatGPT? Klik dan op **Log in**. Dat account mag je gebruiken.
+2. Klik op **Sign up** (aanmelden). Heb je al een account bij OpenAI of ChatGPT? Klik dan op **Log in**, log in zoals altijd en ga naar stap 3.
+   - Nieuw account: typ je e-mailadres en klik **Continue**. Bedenk een wachtwoord, schrijf het op, en klik **Continue**.
+   - OpenAI stuurt nu een **e-mail** (*Check your inbox*). Open je e-mail. Staat er een code in? Typ die over. Staat er een knop of link in? Klik erop.
+   - Vraagt OpenAI je naam en geboortedatum (*Full name*, *Birthday*)? Vul ze in en klik **Continue**.
 3. Krijg je welkomstschermen? Doe dan dit:
    - **Welcome to OpenAI Platform**: typ bij *Organization name* je voornaam. Kies bij *What best describes you?* wat het beste past. Klik **Create organization**.
    - **Invite your team**: klik **I'll invite my team later**.
@@ -173,7 +177,8 @@ Python is het programma waarmee Sofia draait. Je hoeft er zelf niets mee te doen
 2. Open dat bestand:
    - Klik rechtsboven in je internetprogramma op het **pijltje ⬇** en klik op het bestand.
    - Of: open de **Verkenner** (het gele mapje onderaan je scherm), klik links op **Downloads** en dubbelklik op het bestand.
-3. Er opent een venster *Install Python 3.14.7*. ⚠️ Zet **onderaan** een vinkje bij **Add python.exe to PATH**.
+3. Er opent een venster *Install Python 3.14.7 (64-bit)*. ⚠️ Zet **onderaan** een vinkje bij **Add python.exe to PATH**.
+   (Midden in het venster staat ook een Engelse zin met **NOTE: This installer is being retired** en **More info**. Dat is niet erg. Klik daar **niet** op.)
 4. Klik op **Install Now**.
 5. Vraagt Windows *"Wilt u toestaan dat deze app wijzigingen aanbrengt op uw apparaat?"* → klik **Ja**.
 6. Wacht tot je **Setup was successful** ziet. Klik op **Close**.
@@ -208,7 +213,7 @@ Python is het programma waarmee Sofia draait. Je hoeft er zelf niets mee te doen
 3. Klik er met de **rechtermuisknop** op. Klik op **Alles uitpakken...** en daarna op **Uitpakken**.
 4. Er opent een nieuwe map. Daarin zit nóg een map met dezelfde naam. Dubbelklik op die map.
    ✔️ Je ziet onder andere een bestand **START-WINDOWS** en een map **persona**. Dit is **de Sofia-map**.
-5. Gooi het ZIP-bestand weg, zodat je het niet verwart met de map: ga naar **Downloads**, klik met de **rechtermuisknop** op het pictogram **met de ritssluiting** en klik op het **prullenbakje**.
+5. Gooi het ZIP-bestand weg, zodat je het niet verwart met de map: ga naar **Downloads**, klik met de **rechtermuisknop** op het pictogram **met de ritssluiting** en klik op het **prullenbakje** (Windows 10: klik op **Verwijderen**).
 
 **Op een Mac:**
 
@@ -242,7 +247,7 @@ Daarin staat jouw persoonlijke afstemming. Ze staan expres **niet** online.
 
 ## Deel F — Sofia de eerste keer starten
 
-Zorg dat **je notitie** open staat, en **Telegram** ook.
+Zorg dat **je notitie** open staat, en **Telegram** ook. Op een Mac: open ook **de Sofia-map** in Finder (zie het kader in Deel E).
 
 ### Op Windows
 
@@ -275,6 +280,10 @@ Zorg dat **je notitie** open staat, en **Telegram** ook.
 
 ✔️ Je ziet eerst: **Sofia — eerste keer instellen** en daaronder **Ik stel je 3 vragen.**
 
+**Terug naar het venster** (dat moet je een paar keer doen):
+- Windows: klik onderaan in de **taakbalk** op het zwarte pictogram. Of klik op de **balk helemaal bovenaan** het zwarte venster. Klik niet in het zwarte vlak zelf.
+- Mac: klik één keer in het **Terminal-venster**.
+
 **Plakken in het venster:**
 - Windows: klik met de **rechter**muisknop in het zwarte venster. Dan wordt het geplakt.
 - Mac: druk op **Cmd+V**.
@@ -284,7 +293,7 @@ Zorg dat **je notitie** open staat, en **Telegram** ook.
 
 1. Ga naar je notitie. Kopieer je Telegram-token.
    (Zet de muis vlak vóór de eerste cijfers. Houd de linkermuisknop ingedrukt. Sleep tot het einde van de code. Druk **Ctrl+C**, Mac: **Cmd+C**.)
-2. Ga terug naar het venster. Plak. Druk op **Enter**.
+2. Ga terug naar het venster (zie *Terug naar het venster*). Plak. Druk op **Enter**.
 3. Het venster wordt even leeg. Dat is goed: zo is je code niet meer te zien.
 
 ✔️ Je ziet: **✓ Gevonden: je bot heet @...**
@@ -295,16 +304,16 @@ Zorg dat **je notitie** open staat, en **Telegram** ook.
 2. Ga naar Telegram. Typ in het zoekvak de naam van je bot (die staat in je notitie). Klik op je bot.
 3. Klik onderaan op **START**. Zie je geen START-knop? Typ dan **hallo** en druk op **Enter**.
 4. In Telegram gebeurt nu nog niets. Dat is normaal.
-5. Kijk terug naar het venster. Je ziet: *Bericht ontvangen van (jouw naam) (@jouw Telegram-naam).*
+5. Ga terug naar het venster (zie *Terug naar het venster*). Je ziet: *Bericht ontvangen van (jouw naam) (@jouw Telegram-naam).*
    En daaronder: *Ben jij dit? (typ j of n, daarna Enter):*
-6. Typ **j** en druk op **Enter**.
+6. Typ **j** en druk op **Enter**. Typ dit in het venster, **niet** in Telegram.
 
 ✔️ Je ziet: **✓ Jouw Telegram-nummer (ID) is ...**
 
 **Vraag 3 van 3 — Je OpenAI-sleutel** (onderaan staat: `Sleutel:`)
 
 1. Ga naar je notitie. Kopieer je OpenAI-sleutel (begint met **sk-**), net zoals bij vraag 1.
-2. Ga terug naar het venster. Plak. Druk op **Enter**.
+2. Ga terug naar het venster (zie *Terug naar het venster*). Plak. Druk op **Enter**.
 3. Het venster wordt weer even leeg. Dat is goed.
 4. Het venster test nu welke **AI-versie** (een *model*) jouw account mag gebruiken. Dat duurt meestal een halve minuut.
 5. Misschien zie je eerst regels zoals *- gpt-...: werkt niet met jouw account. Geen probleem, ik probeer de volgende...*
@@ -315,14 +324,14 @@ Zorg dat **je notitie** open staat, en **Telegram** ook.
 **Daarna gaat het vanzelf:**
 
 - ✔️ Je ziet: **✓ Instellingen opgeslagen** en **✓ Je privé-bestanden staan op hun plek.**
-  - Zegt het venster dat de privé-bestanden ontbreken? Dan opent het de map **persona**. Zet de twee bestanden daarin, of druk gewoon op **Enter** om zonder verder te gaan.
+  - Zegt het venster dat de privé-bestanden ontbreken? Download ze dan nu (Deel E, stap 6 en 7) en laat ze in **Downloads** staan. Ga terug naar het venster en druk op **Enter**. Wil je zonder verder? Ga terug naar het venster en druk meteen op **Enter**.
 - ✔️ Je ziet: **Klaar! Sofia start nu.** en **LAAT DIT VENSTER OPEN STAAN.**
 - Daarna komen een paar regels in het **Engels**, met de datum en tijd ervoor. Dat is normaal.
 - In een van die regels staat **Sofia is online**. Dan werkt alles.
 - Daarna doet het venster niets meer. Dat is goed: Sofia wacht op jouw bericht. **Laat het venster open.**
 
 > 🗑️ Sofia werkt nu. Je mag je notitie met de twee codes weggooien.
-> Windows: klik in Kladblok, druk **Ctrl+A** en dan **Delete**, sluit Kladblok en kies **Niet opslaan**.
+> Windows: klik in Kladblok, druk **Ctrl+A** en dan **Delete**. Sluit Kladblok met het kruisje. (Vraagt Kladblok of je wilt opslaan? Kies **Niet opslaan**.)
 > Mac: klik met de rechtermuisknop op de notitie en kies **Verwijder**.
 > Heb je ze later nog eens nodig? Dan maak je gewoon nieuwe (zie *Een code per ongeluk gedeeld*).
 
@@ -369,8 +378,8 @@ Zorg dat **je notitie** open staat, en **Telegram** ook.
 **Sofia starten:**
 - **Windows:** dubbelklik op **Sofia** op je **bureaublad**.
   (Die snelkoppeling is de eerste keer vanzelf gemaakt. Staat hij er niet? Dubbelklik dan op **START-WINDOWS** in de Sofia-map.)
-- **Mac:** open de Sofia-map en dubbelklik op **Sofia starten**.
-  (Dat bestand is de eerste keer vanzelf gemaakt. Werkt het niet? Doe dan Deel F, Mac stap 1 t/m 5.)
+- **Mac:** open de Sofia-map en dubbelklik op **Sofia starten** (in Finder heet het misschien *Sofia starten.command*).
+  (Dat bestand is de eerste keer vanzelf gemaakt. Staat het er niet, of werkt het niet? Doe dan Deel F, Mac stap 1 t/m 5.)
 
 > 💡 Start Sofia maar **één keer tegelijk**: niet op twee computers en niet in twee vensters.
 > Kijk eerst onderaan in je scherm (taakbalk of Dock) of er al een venster van Sofia open is.
@@ -385,7 +394,9 @@ Zorg dat **je notitie** open staat, en **Telegram** ook.
 ## Lukt het niet?
 
 **Stopt het met een regel die begint met STOP?**
-Lees die regel. Doe wat er staat. Sluit het venster. Start Sofia daarna opnieuw (Deel H). Je krijgt de vragen dan opnieuw.
+Lees die regel. Doe wat er staat. Sluit het venster. Daarna:
+- Was het de **eerste keer**? Start Sofia opnieuw (Windows: **START-WINDOWS** in de Sofia-map; Mac: **Sofia starten** in de Sofia-map, of Deel F). Je krijgt de vragen dan opnieuw.
+- Was je bezig met **Instellingen opnieuw doen**? Doe dat dan opnieuw.
 
 | Wat zie je? | Wat moet je doen? |
 |---|---|
@@ -399,14 +410,14 @@ Lees die regel. Doe wat er staat. Sluit het venster. Start Sofia daarna opnieuw 
 | *Sofia draait nog in een ander venster* | Sluit het andere venster van Sofia. Start daarna opnieuw. |
 | *Je OpenAI-account heeft geen tegoed* | Doe **Deel C, stap 4 t/m 10**. Wacht 5 minuten. Start Sofia opnieuw. |
 | *OpenAI kent deze sleutel niet* | Kopieer de sleutel opnieuw, helemaal. Lukt het niet? Maak een nieuwe (**Deel C, stap 11 t/m 18**). |
-| *Geen enkele AI-versie werkte* | Controleer je tegoed. Ga naar **https://platform.openai.com/settings/organization/general**. Staat daar **Verify Organization**? Klik erop, leg je **paspoort, ID-kaart of rijbewijs** klaar en volg de stappen. Doe daarna **Instellingen opnieuw doen**. |
+| *Geen enkele AI-versie werkte* | Controleer je tegoed. Ga naar **https://platform.openai.com/settings/organization/general**. Staat daar **Verify Organization**? Klik erop, leg je **paspoort, ID-kaart of rijbewijs** klaar en volg de stappen. Begin daarna opnieuw (zie *Stopt het met een regel die begint met STOP?* hierboven). |
 | *STOP: Telegram accepteert het token van je bot niet (meer)* | Doe **Instellingen opnieuw doen**. Typ in BotFather **/token** voor een nieuw token. |
 | *STOP: Ik kan Telegram niet bereiken* | Controleer je internet. Start Sofia opnieuw. |
 | Sofia antwoordt steeds *"wait, something glitched on my side"* | Stop Sofia. Doe **Instellingen opnieuw doen**. Je mag je codes hetzelfde laten. |
 | Sofia antwoordt helemaal niet | Is het venster nog open? Staat er bovenin *Selecteren*? Druk dan op **Esc**. Staat er een regel met **ERROR**? Maak een screenshot en vraag om hulp. |
 | (Mac) *Operation not permitted* | Open **Systeeminstellingen → Privacy en beveiliging → Bestanden en mappen → Terminal**. Zet de schakelaar bij **Downloads** aan. Sluit Terminal met **Cmd+Q** en begin opnieuw bij **Deel F**. |
 | (Mac) Een Apple-venster over *ontwikkelaarstools* | Klik **Niet nu** of **Annuleer** (niet *Installeer*). Doe daarna **Deel D**. |
-| (Mac) *Sofia starten* kan niet worden geopend | Start Sofia via Terminal: **Deel F, Mac stap 1 t/m 5**. |
+| (Mac) *Sofia starten* staat er niet, of kan niet worden geopend | Start Sofia via Terminal: **Deel F, Mac stap 1 t/m 5**. |
 
 **Hulp vragen:** maak een screenshot van het venster en stuur die naar Claude.
 Je codes zijn niet te zien: het venster verbergt ze zelf. Kijk toch even of er geen lange code met **sk-** of een **:** erin op staat.
@@ -422,14 +433,17 @@ Je gesprekken en Sofia's geheugen blijven gewoon bewaard.
 2. Start de instellingen:
    - **Windows:** open de Sofia-map en dubbelklik op **INSTELLEN-WINDOWS**.
      (Komt het blauwe scherm? **Meer informatie → Toch uitvoeren**.)
-   - **Mac:** open de Sofia-map en dubbelklik op **Sofia opnieuw instellen**.
-     (Werkt dat niet? Doe Deel F, Mac stap 1 t/m 4, typ dan nog een spatie en **--setup** erachter, en druk op **Enter**.)
+   - **Mac:** open de Sofia-map en dubbelklik op **Sofia opnieuw instellen** (misschien heet het *Sofia opnieuw instellen.command*).
+     Werkt dat niet? Doe Deel F, Mac stap 1 t/m 4. Klik dan één keer in het Terminal-venster. Typ een spatie en **--setup**.
+     ✔️ Je ziet: `bash /Users/jouwnaam/Downloads/SofiaBotasma-claude-sofia-companion/start.sh --setup`. Druk op **Enter**.
 3. Bij *Er zijn al instellingen. Opnieuw instellen?* typ je **j** en **Enter**.
 4. Bij *Je Telegram-instellingen hetzelfde laten?*:
    typ **j** als je Telegram-token niet veranderd is. Typ **n** als je een nieuw token hebt.
+   Typte je **n**? Doe dan *Vraag 1 van 3* en *Vraag 2 van 3* uit Deel F: plak het nieuwe token, typ **hallo** in Telegram bij je bot, ga terug naar het venster en typ **j**.
 5. Bij *Je OpenAI-sleutel hetzelfde laten?*:
    typ **j** als je sleutel niet veranderd is. Typ **n** als je een nieuwe sleutel hebt.
-6. Daarna test het venster alles opnieuw en start Sofia vanzelf.
+   Typte je **n**? Doe dan *Vraag 3 van 3* uit Deel F: plak de nieuwe sleutel.
+6. Het venster test alles opnieuw. ✔️ Je ziet: **Klaar! Sofia start nu.** Laat het venster open.
 
 ---
 
@@ -438,7 +452,7 @@ Je gesprekken en Sofia's geheugen blijven gewoon bewaard.
 - **Telegram-token:** typ in BotFather **/revoke** en kies je bot. Daarna **/token**: je krijgt een nieuw token.
   Doe **Instellingen opnieuw doen**. Typ bij *Je Telegram-instellingen hetzelfde laten?* een **n**.
 - **OpenAI-sleutel:** ga naar **https://platform.openai.com/api-keys**. Klik op het **prullenbakje** bij de sleutel.
-  Maak een nieuwe (**Deel C, stap 12 t/m 18**). Doe **Instellingen opnieuw doen**. Typ bij *Je OpenAI-sleutel hetzelfde laten?* een **n**.
+  Open eerst een nieuwe notitie (Deel B, stap 9). Maak dan een nieuwe sleutel (**Deel C, stap 12 t/m 18**). Doe **Instellingen opnieuw doen**. Typ bij *Je OpenAI-sleutel hetzelfde laten?* een **n**.
 
 ---
 

@@ -25,7 +25,7 @@ from telegram import (
     Update,
 )
 from telegram.constants import ChatAction, ChatType
-from telegram.error import BadRequest, Forbidden, NetworkError, RetryAfter, TelegramError, TimedOut
+from telegram.error import BadRequest, Conflict, Forbidden, NetworkError, RetryAfter, TelegramError, TimedOut
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -128,6 +128,7 @@ class SofiaBot:
         self._background: set[asyncio.Task[Any]] = set()
         self.app: Application | None = None
         self.proactive: ProactiveScheduler | None = None
+        self._conflict_logged_at = -1e9
 
     # ================================================================== wiring
     def build(self) -> Application:
@@ -628,7 +629,19 @@ class SofiaBot:
             log.warning("could not write heartbeat", exc_info=True)
 
     async def _on_error(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-        log.error("unhandled error in handler", exc_info=context.error)
+        err = context.error
+        if update is None and isinstance(err, Conflict):
+            # Another copy of Sofia polls the same bot (second window or second computer).
+            now = time.monotonic()
+            if now - self._conflict_logged_at > 300:
+                self._conflict_logged_at = now
+                log.warning("Sofia draait OOK in een ander venster of op een andere computer. Sluit er een van.")
+            return
+        if update is None and isinstance(err, NetworkError):
+            # Polling hiccup (Wi-Fi gone, laptop woke up): python-telegram-bot retries by itself.
+            log.warning("Telegram is even niet bereikbaar (%s). Ik probeer het vanzelf opnieuw.", err)
+            return
+        log.error("unhandled error in handler", exc_info=err)
         if isinstance(update, Update) and update.callback_query is None and update.effective_message is not None:
             text = update.effective_message.text or ""
             if text.startswith("/") and self._authorized(update):

@@ -56,9 +56,9 @@ if not exist ".env" goto setupfail
 
 rem ---- 5. Start Sofia -------------------------------------------------------
 :start
-rem Desktop shortcut "Sofia" (made once), so next time you don't need this folder.
+rem Desktop shortcut "Sofia" (refreshed every start, so it always points at this folder).
 set "SOFIA_DIR=%~dp0"
-powershell -NoProfile -Command "$d=[Environment]::GetFolderPath('Desktop'); $l=Join-Path $d 'Sofia.lnk'; if (-not (Test-Path -LiteralPath $l)) { $s=(New-Object -ComObject WScript.Shell).CreateShortcut($l); $s.TargetPath=(Join-Path $env:SOFIA_DIR 'START-WINDOWS.bat'); $s.WorkingDirectory=$env:SOFIA_DIR; $s.Save() }" >nul 2>nul
+powershell -NoProfile -Command "$l=Join-Path ([Environment]::GetFolderPath('Desktop')) 'Sofia.lnk'; $s=(New-Object -ComObject WScript.Shell).CreateShortcut($l); $s.TargetPath=(Join-Path $env:SOFIA_DIR 'START-WINDOWS.bat'); $s.WorkingDirectory=$env:SOFIA_DIR; $s.Save()" >nul 2>nul
 echo.
 echo  Sofia start nu. LAAT DIT VENSTER OPEN STAAN.
 echo  Venster dicht = Sofia offline. Klik niet in dit venster.
@@ -89,7 +89,11 @@ exit /b 1
 :setupfail
 echo.
 echo  Het instellen is gestopt. Lees hierboven de regel die begint met STOP.
-echo  Doe wat daar staat. Dubbelklik daarna opnieuw op START-WINDOWS.
+if /i "%~1"=="--setup" (
+    echo  Doe wat daar staat. Dubbelklik daarna opnieuw op INSTELLEN-WINDOWS.
+) else (
+    echo  Doe wat daar staat. Dubbelklik daarna opnieuw op START-WINDOWS.
+)
 echo  Lukt het niet? Vraag om hulp.
 pause
 exit /b 1

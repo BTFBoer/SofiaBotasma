@@ -4,6 +4,8 @@ A private Telegram chat with **Sofia**: a fictional 32-year-old woman with her o
 
 One user. Local SQLite memory. Long polling by default. Built on python-telegram-bot 22 and the OpenAI Responses API, behind a provider abstraction.
 
+> 🇳🇱 **Nog nooit geprogrammeerd? Begin bij [HANDLEIDING.md](HANDLEIDING.md)** — stap voor stap, met een startbestand waar je op dubbelklikt (`START-WINDOWS.bat`, of `start.sh` op een Mac) en een installatie-assistent die je codes controleert en je Telegram-ID zelf vindt.
+
 > **This repository is public.** The intimate parts of the persona live in git-ignored `*.private.yaml` overlay files (see [Private overlays](#private-overlays)). Never commit `.env`, `data/` or `persona/*.private.yaml`. If you want everything in git, make the repository private first.
 
 ---
@@ -130,6 +132,10 @@ Dockerfile  docker-compose.yml  requirements.txt  requirements-dev.txt  pyprojec
 ```
 
 ## Setup sequence
+
+Beginner route: double-click `START-WINDOWS.bat` (Windows) or run `bash start.sh` (macOS/Linux). The script finds Python 3.12–3.14, creates `.venv`, installs requirements, runs the interactive setup (`python -m app --setup`: validates the token and key live, finds your Telegram id, picks a model your key can use, writes `.env`) and starts the bot. Re-run setup with `INSTELLEN-WINDOWS.bat` or `bash start.sh --setup`. Python 3.15 is refused for now: the pinned pydantic-core and PyYAML have no 3.15 wheels yet.
+
+Manual route:
 
 1. **Create the bot.** In Telegram, open **@BotFather**, send `/newbot`, display name `Sofia`, and a username ending in `bot` (see [BotFather configuration](#botfather-configuration) for the rest).
 2. **Get the token.** BotFather replies with a token like `123456789:AA…`. Keep it secret.

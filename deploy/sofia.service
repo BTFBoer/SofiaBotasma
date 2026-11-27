@@ -1,0 +1,28 @@
+# systemd unit for running Sofia without Docker on a Linux VPS.
+# Install:
+#   sudo cp deploy/sofia.service /etc/systemd/system/sofia.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now sofia
+# Logs:
+#   journalctl -u sofia -f
+[Unit]
+Description=Sofia Telegram companion
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sofia
+WorkingDirectory=/opt/sofia-telegram
+EnvironmentFile=/opt/sofia-telegram/.env
+ExecStart=/opt/sofia-telegram/.venv/bin/python -m app
+Restart=always
+RestartSec=10
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/sofia-telegram/data
+
+[Install]
+WantedBy=multi-user.target
